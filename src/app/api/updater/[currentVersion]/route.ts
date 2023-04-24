@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
 import { env } from "process";
+export const dynamic = "force-dynamic";
 
-async function getReleases(repo: string) {
-  const url = `https://api.github.com/repos/${repo}/releases`;
-  const response = await fetch(url);
+async function getReleases(owner: string, repo: string) {
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
+  const response = await fetch(url, { next: { revalidate: 0 } });
   const data = await response.json();
   return data;
 }
 
 async function downloadFile(url: string) {
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 0 } });
   const data = await res.blob();
   const text = await data.text();
   return text;
 }
 
-async function getLatestRelease(repo: string): Promise<Release> {
-  const releases = await getReleases(repo);
+async function getLatestRelease(owner: string, repo: string): Promise<Release> {
+  const releases = await getReleases(owner, repo);
   return releases[0];
 }
 
@@ -43,17 +44,22 @@ export async function GET(
   request: Request,
   { params }: { params: { currentVersion: string } }
 ) {
-  const repo = env.GIT_REPO as string;
+  try {
+    const [owner, repo] = env.GIT_REPO?.split("/") as string[];
 
-  const releaseData = await getLatestRelease(repo);
-  const platforms = await downloadAllSig(releaseData.assets);
+    const releaseData = await getLatestRelease(owner, repo);
+    const platforms = await downloadAllSig(releaseData.assets);
 
-  return NextResponse.json({
-    version: releaseData.tag_name,
-    notes: "Release version",
-    pub_date: releaseData.published_at,
-    platforms,
-  });
+    return NextResponse.json({
+      version: releaseData.tag_name,
+      notes: "Release version",
+      pub_date: releaseData.published_at,
+      platforms,
+    });
+  } catch (error: any) {
+    console.log(error);
+    return NextResponse.error();
+  }
 }
 
 interface Asset {
