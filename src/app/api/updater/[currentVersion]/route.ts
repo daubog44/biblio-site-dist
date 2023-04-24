@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { env } from "process";
 
-async function getReleases(owner: string, repo: string) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
-  const response = await fetch(url, { next: { revalidate: 60 * 60 } });
+async function getReleases(repo: string) {
+  const url = `https://api.github.com/repos/${repo}/releases`;
+  const response = await fetch(url);
   const data = await response.json();
   return data;
 }
 
 async function downloadFile(url: string) {
-  const res = await fetch(url, { next: { revalidate: 60 * 60 } });
+  const res = await fetch(url);
   const data = await res.blob();
   const text = await data.text();
   return text;
 }
 
-async function getLatestRelease(owner: string, repo: string): Promise<Release> {
-  const releases = await getReleases(owner, repo);
+async function getLatestRelease(repo: string): Promise<Release> {
+  const releases = await getReleases(repo);
   return releases[0];
 }
 
@@ -43,9 +43,9 @@ export async function GET(
   request: Request,
   { params }: { params: { currentVersion: string } }
 ) {
-  const [owner, repo] = env.GIT_REPO?.split("/") as string[];
+  const repo = env.GIT_REPO as string;
 
-  const releaseData = await getLatestRelease(owner, repo);
+  const releaseData = await getLatestRelease(repo);
   const platforms = await downloadAllSig(releaseData.assets);
 
   return NextResponse.json({
